@@ -1,0 +1,30 @@
+## Interface: 16001
+## Title: Earshot
+## Notes: NPC voices fade as you walk away and soften when the speaker is behind you. Made for Spoken on WoW Forever.
+## Author: Rob
+## Version: 0.3.3
+## IconTexture: Interface\AddOns\Earshot\Media\Icon
+## AddonCompartmentFunc: Earshot_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: Earshot_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: Earshot_OnAddonCompartmentLeave
+## SavedVariables: EarshotDB
+## SavedVariablesPerCharacter: EarshotCharDB
+## Category: Audio & Video
+## OptionalDeps: Spoken
+## X-License: MIT
+## X-Website: https://github.com/Squeshly-Freezed/Earshot
+
+Libs\LibStub\LibStub.lua
+Libs\LibRangeCheck-3.0\LibRangeCheck-3.0.lua
+
+Math.lua
+Core.lua
+Volume.lua
+Anchors.lua
+Spatial.lua
+Plates.lua
+Markers.lua
+SpokenLink.lua
+API.lua
+Test.lua
+Options.lua
