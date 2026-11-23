@@ -156,6 +156,10 @@ say when its own voice clips end, so that bubble stays for about as long as the 
 takes to say. Whispers aren't marked, and neither are the short greetings NPCs make when
 you click on them: the game doesn't tell addons about those.
 
+## Bugs and feedback
+
+Report bugs on [GitHub](https://github.com/Squeshly-Freezed/Earshot/issues).
+
 ## For other voice addons
 
 Any addon playing its voice on the Ambience, Music or Dialog slider can use Earshot:

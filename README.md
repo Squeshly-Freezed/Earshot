@@ -44,6 +44,10 @@ moves the volume slider Spoken plays on while a line plays, and puts it back aft
 It knows where you are and which way you face, and where the NPC was when you talked to it
 (or where you were when it spoke).
 
+## Bugs and feedback
+
+Report bugs on [GitHub](https://github.com/Squeshly-Freezed/Earshot/issues).
+
 ## Development
 
 Tests, the zip, and the pictures: see [DEV.md](DEV.md). In short:

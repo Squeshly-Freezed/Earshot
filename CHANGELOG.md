@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The author is listed as SqueshlyFreezed, the name used on CurseForge and Buy Me a Coffee.
+- The guide says where to report bugs.
+
 ## 0.3.3
 
 First public release.
