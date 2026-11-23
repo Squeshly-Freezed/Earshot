@@ -15,7 +15,7 @@ First public release.
   skip every NPC out of earshot, or wait until you come back.
 - Follow speakers by nameplate (off by default) keeps track of the talking NPC while it
   speaks. Friendly NPC nameplates are cut down to their names (with titles such as
-  <Stable Master> underneath) and can't be clicked. Your own nameplate options come back in
+  `<Stable Master>` underneath) and can't be clicked. Your own nameplate options come back in
   combat and when you switch it off.
 - A speech bubble over the NPC who's talking, also for NPC lines that only show in chat.
 - Works with Spoken 3.12: a line you go back to with Previous plays as normal from a

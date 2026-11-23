@@ -38,7 +38,7 @@ that lists your addons), or type `/earshot`.
 | Yells heard up to | 120 yd | The same for yells. At the top of the slider, Anywhere, yells aren't faded. |
 | Follow speakers by nameplate | off | Keeps track of the talking NPC while it speaks. See below. |
 | Hide friendly NPC nameplates | on | While following, friendly NPC nameplates show only their names, and can't be clicked. |
-| Show NPC titles | on | Titles such as <Stable Master> under those names. |
+| Show NPC titles | on | Titles such as `<Stable Master>` under those names. |
 | Mark who's talking | on | A speech bubble over the NPC who's talking. See below. |
 | Also NPCs talking without a voice | on | The bubble for lines that only show in chat too. |
 
@@ -125,7 +125,7 @@ combat only your target has a nameplate). With **Hide friendly NPC nameplates** 
 Earshot then hides everything on friendly NPC nameplates except their names, and makes
 them unclickable. Once an NPC has a nameplate, the game shows its name there instead of
 above its head, so that's where NPC names come from now. They still follow your NPC name
-settings. Nameplates don't show titles such as <Stable Master>, so **Show NPC titles**
+settings. Nameplates don't show titles such as `<Stable Master>`, so **Show NPC titles**
 adds them underneath, read from the NPC's tooltip.
 
 Enemy and player nameplates aren't touched, but Always Show does mean enemy nameplates
