@@ -42,7 +42,8 @@ checks the real `Libs/` files compile and that LibStub works.
 The harness can't hear anything or see the real settings page or nameplates, so check
 those in game with `/earshot test` and `/earshot status`.
 
-GitHub runs the tests and builds the zip on every push (`.github/workflows/tests.yml`).
+GitHub runs the tests and builds the zip on every push (`.github/workflows/tests.yml`), and
+attaches the zip to each release you publish (`.github/workflows/release.yml`).
 
 ## Building the zip
 
@@ -90,7 +91,9 @@ the tests.
 ## A new version
 
 1. Bump `## Version` in `Earshot/Earshot.toc` and add a section to `CHANGELOG.md`.
-2. `python tools/package.py`.
-3. Upload the zip to CurseForge, and attach it to a GitHub release tagged `v<version>`.
+2. `python tools/package.py`, and push.
+3. Publish a GitHub release tagged `v<version>`. GitHub attaches the zip to it a minute or
+   two later; the release workflow stops if the tag and the version don't match.
+4. Upload the same zip to CurseForge.
 
 Spoken changes often, so check Earshot against its newest release before each one.
