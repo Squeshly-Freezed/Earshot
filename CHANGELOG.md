@@ -1,7 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.3.4
 
+- Following speakers by nameplate no longer keeps a voice at full volume as you walk away
+  from the NPC. With the camera behind you, an NPC between you and the camera shows on
+  screen as if it were ahead of you, and Earshot took it to be. It now tells the two apart,
+  mostly from how the NPC's distance changes as you walk.
+- `/earshot debug` prints a line a second while a voice plays: where Earshot puts the
+  speaker, and what following reads from the game.
+- Names on hidden friendly NPC nameplates are green (yellow for neutral NPCs), like the
+  names the game shows above NPCs' heads. The game draws nameplate names white. Titles under
+  them are now the same size as the name.
 - The author is listed as SqueshlyFreezed, the name used on CurseForge and Buy Me a Coffee.
 - The guide says where to report bugs.
 

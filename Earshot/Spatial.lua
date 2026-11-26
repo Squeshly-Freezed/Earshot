@@ -181,6 +181,7 @@ function Spatial:Update(dt)
         return
     end
     self:CheckAway(session)
+    if ns.debug then ns.DebugTick(session) end
 end
 
 -- Out of earshot for a moment (not just stepping over the edge): tell whoever placed the voice.

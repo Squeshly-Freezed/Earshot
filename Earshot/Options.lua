@@ -267,6 +267,20 @@ local function Where(angle)
     return angle > 0 and ", to your left" or ", to your right"
 end
 
+-- /earshot debug: while a voice is placed, a line a second on where Earshot has the speaker,
+-- and what following read from the game. Lasts until /reload.
+local debugAt = 0
+function ns.DebugTick(session)
+    if not ns.debug then return end
+    local now = GetTime()
+    if now - debugAt < 1 then return end
+    debugAt = now
+    local info = ns.Spatial.info
+    local where = info and info.distance and ("%d yd away%s"):format(math.floor(info.distance + 0.5), Where(info.angle))
+        or "somewhere Earshot can't tell"
+    ns.Print("Debug: voice %s, at %d%%. %s", where, math.floor(ns.Spatial.level * 100 + 0.5), ns.Plates:Trace(session))
+end
+
 function ns.Status()
     local db = ns.db
     ns.Print(db.enabled and "On." or "Off. Type /earshot on to switch it on.")
@@ -358,8 +372,12 @@ SlashCmdList.EARSHOT = function(input)
         ns.Plates:Update()
         if Settings and Settings.NotifyUpdate then Settings.NotifyUpdate("EARSHOT_ENABLED") end
         ns.Print(ns.db.enabled and "On." or "Off.")
+    elseif command == "debug" then
+        ns.debug = not ns.debug
+        ns.Print(ns.debug and "Debug readout on: a line a second while a voice is placed. /earshot debug again turns it off."
+            or "Debug readout off.")
     elseif command == "help" or not Options.category then
-        ns.Print("/earshot opens the settings. Also: /earshot test, status, spoken, on, off.")
+        ns.Print("/earshot opens the settings. Also: /earshot test, status, spoken, on, off, debug.")
     else
         Options:Open()
     end

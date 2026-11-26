@@ -49,7 +49,8 @@ Earshot's settings and leaves those two alone. At the bottom: a test sound, a ch
 setup, and a shortcut to Spoken's settings.
 
 Commands: `/earshot test`, `/earshot status`, `/earshot spoken`, `/earshot on`, `/earshot off`,
-`/earshot help`. Hover over Earshot in the minimap addon menu to see whether it's on.
+`/earshot help`, and `/earshot debug` (a line a second on where Earshot puts a voice, and
+what following reads from the game, until you type it again). Hover over Earshot in the minimap addon menu to see whether it's on.
 
 ## Good to know
 
@@ -124,9 +125,11 @@ of combat: **Friendly NPC nameplates**, and **Always Show Nameplates** (with it 
 combat only your target has a nameplate). With **Hide friendly NPC nameplates** on,
 Earshot then hides everything on friendly NPC nameplates except their names, and makes
 them unclickable. Once an NPC has a nameplate, the game shows its name there instead of
-above its head, so that's where NPC names come from now. They still follow your NPC name
-settings. Nameplates don't show titles such as `<Stable Master>`, so **Show NPC titles**
-adds them underneath, read from the NPC's tooltip.
+above its head, so that's where NPC names come from now. Earshot colours them as the game
+does above heads (green for friendly NPCs, yellow for neutral ones), and they still follow
+your NPC name settings. Nameplates don't show titles such as `<Stable Master>`, so **Show
+NPC titles** adds them underneath, read from the NPC's tooltip. NPCs too far away to have a
+nameplate keep the game's own name above their heads.
 
 Enemy and player nameplates aren't touched, but Always Show does mean enemy nameplates
 also show outside combat, unless something switches them off then: Leatrix Plus's

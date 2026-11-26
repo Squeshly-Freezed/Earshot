@@ -173,7 +173,9 @@ local function NewClient(opts)
     env.UnitExists = function(unit) return H.units[unit] ~= nil end
     env.UnitGUID = function(unit) return H.units[unit] and H.units[unit].guid end
     env.UnitName = function(unit) return H.units[unit] and H.units[unit].name end
-    env.issecretvalue = function() return false end
+    -- A stand-in for a value the game keeps secret from addons.
+    H.SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
+    env.issecretvalue = function(value) return value == H.SECRET end
 
     -- Nameplates, the camera and range checks, all worked out from where NPCs really stand.
     -- H.npcs[guid] = { north, west, assist }; H.ShowPlate(guid, kind) gives it a nameplate.
@@ -189,6 +191,7 @@ local function NewClient(opts)
     env.NamePlateSetupOptions = {}
     env.WorldFrame = {
         GetLeft = function() return 0 end, GetWidth = function() return 1920 end,
+        GetBottom = function() return 0 end, GetHeight = function() return 1000 end,
         GetEffectiveScale = function() return 1 end,
     }
     H.tooltipLines = {}
@@ -208,8 +211,35 @@ local function NewClient(opts)
             return unpack(results)
         end)
     end
-    -- The game's own name update for unit frames and nameplates (the addon hooks it).
-    env.CompactUnitFrame_UpdateName = function(frame) H.nameUpdates = (H.nameUpdates or 0) + 1 end
+    -- The game's own name update for unit frames and nameplates (the addon hooks it). Like the
+    -- game's in every nameplate style but Legacy, it draws names white, and a dead NPC's grey.
+    env.CompactUnitFrame_UpdateName = function(frame)
+        H.nameUpdates = (H.nameUpdates or 0) + 1
+        local name = type(frame) == "table" and frame.name
+        if name and name.SetVertexColor then
+            local u = H.units[frame.unit]
+            if u and u.dead and not u.player then
+                name:SetVertexColor(0.5, 0.5, 0.5)
+            elseif H.legacyStyle then -- the Legacy style colours names like those above heads
+                local r, g, b = env.UnitSelectionColor(frame.unit, true)
+                name:SetVertexColor(r, g, b)
+            else
+                name:SetVertexColor(1, 1, 1)
+            end
+        end
+    end
+    env.UnitIsDead = function(unit) local u = H.units[unit]; return u ~= nil and u.dead == true end
+    -- The colours of names above units' heads: green friendly, yellow neutral, red hostile.
+    -- H.npcs[guid].reaction as from UnitReaction (4 neutral, 5 and up friendly).
+    env.UnitSelectionColor = function(unit)
+        local u = H.units[unit]
+        if not u then return 1, 1, 1, 1 end
+        if H.selectionSecret then return H.SECRET, H.SECRET, H.SECRET, 1 end
+        local npc = u.guid and H.npcs[u.guid] or {}
+        local reaction = npc.reaction or (u.attackable and 2 or 5)
+        if reaction >= 5 then return 0, 1, 0, 1 elseif reaction == 4 then return 1, 1, 0, 1 end
+        return 1, 0, 0, 1
+    end
     env.LEVEL = "Level"
     env.Enum = { TooltipDataLineType = { UnitName = 2 } }
     -- Tooltip data: the NPC's name, its title if it has one (H.npcs[guid].title), then its level.
@@ -235,13 +265,24 @@ local function NewClient(opts)
         return math.sqrt(dn * dn + dw * dw), angle
     end
     H.Relative = Relative
+    -- The camera sits H.cameraZoom yards behind the player (0: at the player), looking the way
+    -- the player faces. Where an NPC is from it: how far ahead, and the angle off its view
+    -- (+ = left). An NPC between the camera and the player is ahead of the camera too.
+    -- It looks down at the player at H.cameraPitch, and a nameplate sits H.plateLift yards
+    -- above the height it looks at.
+    H.cameraZoom, H.cameraPitch, H.plateLift = 0, math.rad(20), 1
+    env.GetCameraZoom = function() return H.cameraZoom end
+    local function FromCamera(guid)
+        local distance, angle = Relative(guid)
+        local ahead = distance * math.cos(angle) + H.cameraZoom
+        return ahead, math.atan2(distance * math.sin(angle), ahead)
+    end
     local function NPCOf(token) local u = H.units[token]; return u and u.guid and H.npcs[u.guid] and u.guid end
     env.C_NamePlateManager = {
         IsNamePlateUnitBehindCamera = function(token)
             local guid = NPCOf(token)
             if not guid then return false end
-            local _, angle = Relative(guid)
-            return math.abs(angle) > math.pi / 2
+            return (FromCamera(guid)) <= 0
         end,
     }
     env.C_NamePlate = {
@@ -305,8 +346,10 @@ local function NewClient(opts)
             end
             face.selectionHighlight.alpha, face.aggroFlash.alpha = 0.25, 0
             function face.name:GetFont() return "Fonts\\FRIZQT__.TTF", 12, "OUTLINE" end
-            function face.name:GetTextColor() return 1, 0.82, 0 end
-            function face.name:GetVertexColor() return 0.1, 1, 0.1 end -- the game tints it green
+            function face.name:GetTextColor() return 1, 1, 1 end
+            face.name.tint = { 1, 1, 1 }
+            function face.name:SetVertexColor(r, g, b) self.tint = { r, g, b } end
+            function face.name:GetVertexColor() return self.tint[1], self.tint[2], self.tint[3] end
             function face:CreateFontString()
                 local fs = H.Region(self)
                 self.fontStrings = self.fontStrings or {}
@@ -326,21 +369,24 @@ local function NewClient(opts)
         function plate:IsVisible()
             local here = NPCOf(self.unitToken)
             if not here then return true end
-            local _, angle = Relative(here)
-            return math.abs(angle) < math.pi / 4
+            local ahead, angle = FromCamera(here)
+            return ahead > 0 and math.abs(angle) < math.pi / 4
         end
         function plate:GetCenter()
             local here = NPCOf(self.unitToken)
             if not here then return 960, 500 end
-            local _, angle = Relative(here)
-            return 960 * (1 - math.tan(angle)), 500
+            local ahead, angle = FromCamera(here)
+            local lift = H.plateLift + (H.npcs[here].height or 0) -- an NPC on a balcony is higher up
+            local drop = math.atan2(H.cameraZoom * math.tan(H.cameraPitch) - lift, ahead)
+            return 960 * (1 - math.tan(angle)), 500 + 500 * math.tan(H.cameraPitch - drop) / math.tan(math.rad(30))
         end
         function plate:GetEffectiveScale() return 1 end
         function plate:GetFrameLevel() return 2 end
         H.plates[token] = plate
-        face:UpdateHitTestArea(env.NamePlateSetupOptions) -- the game sets the nameplate up first
+        -- The game sets the nameplate up for its unit, name included, before addons hear of it.
+        face:UpdateHitTestArea(env.NamePlateSetupOptions)
+        env.CompactUnitFrame_UpdateName(face)
         H.Fire("NAME_PLATE_UNIT_ADDED", token)
-        env.CompactUnitFrame_UpdateName(face) -- and its name
         return token, plate
     end
     function H.RemovePlate(token)
@@ -1374,6 +1420,121 @@ scenario("following an NPC who walks with you", function()
     check(J.Vol("Ambience") < 0.05, "without following, the voice stays where you met them", J.Vol("Ambience"))
 end)
 
+scenario("following a quest giver you walk away from, with the camera behind you", function()
+    -- The camera sits behind you. Walking away from the NPC, it stays between you and the
+    -- camera for a while, so its nameplate is on screen, in the middle, as if it were ahead of
+    -- you. It's behind you, and its voice should fade as it does without following: also with
+    -- the camera far back, and with the NPC up on a balcony, where its nameplate shows high.
+    local function WalkAway(H, follow, camera, height, hidden, says)
+        if follow then Follow(H, true) end
+        H.cameraZoom = camera
+        if hidden then H.env.GetCameraZoom = nil end -- a game that won't say how far back it is
+        if says then H.env.GetCameraZoom = function() return says end end -- or says it wrong
+        H.MoveTo(0, 0, 0)
+        H.TalkTo(NPC)
+        H.npcs[NPC] = { north = 2.5, west = 0, height = height }
+        H.ShowPlate(NPC)
+        H.Spoken("CLIP_STARTED", H.Clip("quests", NPC, { key = "walk-away" }))
+        H.Advance(0.5)
+        H.CloseWindow()
+        local heard = {}
+        for south = 0, 40, 2 do
+            H.MoveTo(-south, 0, pi) -- facing south, away from the NPC
+            H.Advance(0.4)
+            heard[south] = H.Vol("Ambience")
+        end
+        return heard
+    end
+    local plain = WalkAway(NewClient({ spoken = "Ambience" }), false, 20, 0)
+    for _, case in ipairs({ { 20, 0 }, { 30, 0 }, { 39, 0 }, { 20, 5 }, { 20, 0, true }, { 20, 0, false, 2 } }) do
+        local camera, height, hidden, says = case[1], case[2], case[3], case[4]
+        local H = NewClient({ spoken = "Ambience" })
+        local followed = WalkAway(H, true, camera, height, hidden, says)
+        local label = ("camera %d yd back%s%s%s: "):format(camera, height > 0 and ", NPC 5 yd up" or "",
+            hidden and ", distance unknown" or "", says and (", game says %d yd"):format(says) or "")
+        local spot = H.ns.Spatial.session.spot
+        check(math.abs(spot.north - 2.5) < 3 and math.abs(spot.west) < 3, label .. "Earshot's spot stays by the NPC",
+            ("%.1f, %.1f"):format(spot.north, spot.west))
+        for _, south in ipairs({ 10, 20, 30, 40 }) do
+            check(near(followed[south], plain[south], 0.03),
+                label .. ("%d yd away it fades as without following"):format(south),
+                ("%.3f vs %.3f"):format(followed[south], plain[south]))
+        end
+        H.Slash("status")
+        local said = table.concat(H.chat, "\n")
+        check(said:find("behind you", 1, true) ~= nil, label .. "status says the NPC is behind you",
+            said:match("Placing[^\n]*") or "nothing")
+        check(#H.errors == 0, label .. "no errors", H.errors[1])
+    end
+    -- /earshot debug: a line a second while the voice plays, on what following read.
+    local H = NewClient({ spoken = "Ambience" })
+    H.Slash("debug")
+    check(H.LastChat():find("Debug readout on", 1, true) ~= nil, "/earshot debug switches the readout on")
+    local before = #H.chat
+    WalkAway(H, true, 20, 0)
+    local lines = {}
+    for i = before + 1, #H.chat do
+        if H.chat[i]:find("Debug: voice", 1, true) then table.insert(lines, H.chat[i]) end
+    end
+    check(#lines >= 6 and #lines <= 10, "about one line a second", #lines)
+    local last = lines[#lines] or ""
+    check(last:find("Following: range over 28 yd (items over 28, interaction over 28)", 1, true) ~= nil
+        and last:find("behind you", 1, true) ~= nil and last:find("off screen (behind the camera)", 1, true) ~= nil,
+        "saying what the game read, and where the nameplate is", last)
+    local walking
+    for _, line in ipairs(lines) do
+        if line:find("nameplate on screen", 1, true) and line:find("behind (by your walking)", 1, true) then
+            walking = line
+        end
+    end
+    check(walking ~= nil, "and, while the NPC was between you and the camera, why it's behind you",
+        table.concat(lines, "\n"))
+    H.Slash("debug")
+    check(H.LastChat():find("Debug readout off", 1, true) ~= nil, "and off again")
+    check(#H.errors == 0, "debug: no errors", H.errors[1])
+end)
+
+scenario("following chatter from an NPC just behind you", function()
+    -- You stand still, the camera 20 yd behind you. An NPC 6 yd behind you speaks: its
+    -- nameplate is on screen, in the middle, but below you, so it's between you and the camera.
+    local H = NewClient({ spoken = "Ambience" })
+    Follow(H, true)
+    H.cameraZoom = 20
+    H.MoveTo(0, 0, 0)
+    H.npcs[FARMER] = { north = -6, west = 0 }
+    H.ShowPlate(FARMER)
+    H.Fire("CHAT_MSG_MONSTER_SAY", "Mind your step.", "Farmer")
+    H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "Mind your step.", key = "c-behind" }))
+    H.Advance(1)
+    local spot = H.ns.Spatial.session.spot
+    check(spot.north < -2, "Earshot puts the NPC behind you", ("%.1f yd north"):format(spot.north))
+    check(#H.errors == 0, "no errors", H.errors[1])
+end)
+
+scenario("following an NPC who walks with you, with the camera far back", function()
+    -- With the camera 30 yd back, an escort a few yards ahead shows on screen almost where it
+    -- would just behind you. It keeps up however far you go, so it's walking with you.
+    local ESCORT = "Creature-0-1-2-3-700-0000ABAB"
+    local H = NewClient({ spoken = "Ambience" })
+    Follow(H, true)
+    H.cameraZoom = 30
+    H.MoveTo(0, 0, 0)
+    H.TalkTo(ESCORT, "Escort")
+    H.npcs[ESCORT] = { north = 3, west = 0 }
+    H.ShowPlate(ESCORT)
+    H.Spoken("CLIP_STARTED", H.Clip("quests", ESCORT, { key = "escort-far" }))
+    H.CloseWindow()
+    for north = 0, 40, 2 do
+        H.MoveTo(north, 0, 0)
+        H.npcs[ESCORT].north = north + 3
+        H.Advance(0.4)
+    end
+    check(H.Vol("Ambience") > 0.7, "40 yd on, still near full volume", H.Vol("Ambience"))
+    H.Slash("status")
+    check(table.concat(H.chat, "\n"):find("behind you", 1, true) == nil, "status doesn't put it behind you")
+    check(#H.errors == 0, "no errors", H.errors[1])
+end)
+
 scenario("following uses every range step the library has", function()
     -- For an NPC you can assist, LibRangeCheck's usual answer only has its 5 yd item check.
     -- The 8 and 28 yd steps come from asking it to leave items out, so Earshot asks both ways.
@@ -1946,8 +2107,10 @@ scenario("NPC titles under the names on hidden nameplates", function()
     check(title and title.shown and title.text == "<Stable Master>", "the title shows", title and title.text)
     check(title.points[1][1] == "TOP" and title.points[1][2] == face.name and title.points[1][3] == "BOTTOM",
         "just under the name")
-    check(title.tint and title.tint[1] == 0.1 and title.tint[2] == 1 and title.font ~= nil,
-        "tinted like the name, in its font")
+    check(title.tint and title.tint[1] == 0 and title.tint[2] == 1 and title.tint[3] == 0,
+        "green like the name", title.tint and table.concat(title.tint, ","))
+    check(title.font == "Fonts\\FRIZQT__.TTF" and title.size == 12 and title.flags == "OUTLINE",
+        "in the name's font, at the same size (as above NPCs' heads)", title.size)
     local reads = H.tooltipReads
     H.npcs["Creature-0-1-2-3-300-0000CCCD"] = { north = 11, west = 0, title = "Stable Master" }
     H.ShowPlate("Creature-0-1-2-3-300-0000CCCD")
@@ -1975,6 +2138,58 @@ scenario("NPC titles under the names on hidden nameplates", function()
     check(title.shown, "and on")
     H.settings.registered.EARSHOT_HIDEPLATES:SetValue(false)
     check(not title.shown, "nameplates shown in full: no extra line")
+    check(#H.errors == 0, "no errors", H.errors[1])
+end)
+
+scenario("names on hidden nameplates coloured like names above NPCs' heads", function()
+    local H = NewClient({ spoken = "Ambience" })
+    Follow(H, true)
+    local function Tint(face) return table.concat(face.name.tint, ",") end
+    H.npcs[FARMER] = { north = 10, west = 0 }
+    local token, plate = H.ShowPlate(FARMER)
+    local face = plate.UnitFrame
+    check(Tint(face) == "0,1,0", "a friendly NPC's name is green, not the game's nameplate white", Tint(face))
+    H.env.CompactUnitFrame_UpdateName(face)
+    check(Tint(face) == "0,1,0", "and stays green when the game redoes the name", Tint(face))
+    local NEUTRAL = "Creature-0-1-2-3-600-0000FFFF"
+    H.npcs[NEUTRAL] = { north = 12, west = 0, reaction = 4 }
+    local _, neutral = H.ShowPlate(NEUTRAL)
+    check(Tint(neutral.UnitFrame) == "1,1,0", "a neutral NPC you can't attack: yellow", Tint(neutral.UnitFrame))
+    H.units[token].dead = true
+    H.env.CompactUnitFrame_UpdateName(face)
+    check(Tint(face) == "0.5,0.5,0.5", "a dead NPC keeps the game's grey", Tint(face))
+    H.units[token].dead = false
+    H.env.CompactUnitFrame_UpdateName(face)
+    check(Tint(face) == "0,1,0", "green again", Tint(face))
+    H.selectionSecret = true
+    H.env.CompactUnitFrame_UpdateName(face)
+    check(Tint(face) == "1,1,1" and #H.errors == 0, "when the game keeps the colour secret, its own white stays",
+        Tint(face))
+    H.selectionSecret = nil
+    H.env.CompactUnitFrame_UpdateName(face)
+    local _, enemy = H.ShowPlate("Creature-0-1-2-3-700-00001111", "enemy")
+    check(Tint(enemy.UnitFrame) == "1,1,1", "an enemy's nameplate keeps the game's colour", Tint(enemy.UnitFrame))
+    -- The game reuses a hidden nameplate for an enemy, setting it up before Earshot hears.
+    H.RemovePlate(token)
+    local _, reused = H.ShowPlate("Creature-0-1-2-3-800-00002222", "enemy")
+    check(reused.UnitFrame == face, "(the game reused the farmer's nameplate)")
+    check(Tint(face) == "1,1,1", "reused for an enemy: the game's colour", Tint(face))
+    H.settings.registered.EARSHOT_HIDEPLATES:SetValue(false)
+    check(Tint(neutral.UnitFrame) == "1,1,1", "Hide friendly NPC nameplates off: the game's colour again",
+        Tint(neutral.UnitFrame))
+    H.settings.registered.EARSHOT_HIDEPLATES:SetValue(true)
+    check(Tint(neutral.UnitFrame) == "1,1,0", "and on: yellow again", Tint(neutral.UnitFrame))
+    -- In the game's Legacy nameplate style it colours names itself: an enemy's red.
+    H.legacyStyle = true
+    local VENDOR = "Creature-0-1-2-3-900-00003333"
+    H.npcs[VENDOR] = { north = 13, west = 0 }
+    local vendorToken, vendor = H.ShowPlate(VENDOR)
+    check(Tint(vendor.UnitFrame) == "0,1,0", "Legacy style: a friendly NPC's name is green as before",
+        Tint(vendor.UnitFrame))
+    H.RemovePlate(vendorToken)
+    local _, raider = H.ShowPlate("Creature-0-1-2-3-950-00004444", "enemy")
+    check(raider.UnitFrame == vendor.UnitFrame and Tint(raider.UnitFrame) == "1,0,0",
+        "and that nameplate reused for an enemy keeps the red the game gave it", Tint(raider.UnitFrame))
     check(#H.errors == 0, "no errors", H.errors[1])
 end)
 
