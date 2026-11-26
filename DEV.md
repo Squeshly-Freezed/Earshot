@@ -15,11 +15,9 @@ python tests/run.py
 
 The scenarios cover walking away, turning around, the gap between lines, lines waiting in
 Spoken's queue, logout, replays, dungeons, chatter (said, yelled and whispered), the
-presets and the other sliders, the test sound and the minimap addon menu. For following,
-they cover the nameplate options being switched on and put back (and handed back for each
-fight), friendly NPC nameplates cut down to their names (and titles, read from pretend
-tooltips) and unclickable while enemy and player ones are left alone, chatter and an
-escort followed by nameplate, the range steps, and the who's-talking bubble.
+presets and the other sliders, the test sound, the minimap addon menu and the who's-talking
+bubble, and giving back the nameplate options Earshot 0.3 changed for following (which
+version 0.4 dropped; its last attempt is on the `following-experiment` branch).
 
 The settings page is checked too: its sections, labels that fit, rows greying out while
 Earshot is off (and being redrawn when the setting they depend on changes, as the game's
@@ -33,13 +31,7 @@ if it had played, and one skipped during it leaves the timer running, which can 
 Spoken's cue between lines at the wrong moment. Every scenario checks Earshot never does
 either (it silences the line and skips or stops it a frame later).
 
-The harness loads the files in `Earshot.toc` except `Libs/`. In their place it has a fake
-LibRangeCheck-3.0 that answers the way the real one does on Forever: a 5 yd item check for
-an NPC you can assist, the 8 and 28 yd interaction distances when told to leave items out
-(or for an NPC you can't assist), plus any class spells a test gives it. One scenario
-checks the real `Libs/` files compile and that LibStub works.
-
-The harness can't hear anything or see the real settings page or nameplates, so check
+The harness loads the files in `Earshot.toc`. It can't hear anything or see the real settings page or nameplates, so check
 those in game with `/earshot test` and `/earshot status`.
 
 GitHub runs the tests and builds the zip on every push (`.github/workflows/tests.yml`), and
@@ -81,12 +73,6 @@ pip install pillow
 python tools/make_logo.py
 python tools/make_marker.py Earshot/Media/Speaking.tga
 ```
-
-## Libraries
-
-`Earshot/Libs/` holds LibStub (public domain) and LibRangeCheck-3.0 (MIT, its LICENSE file
-is next to it). To update LibRangeCheck, replace its folder with the new release and run
-the tests.
 
 ## A new version
 

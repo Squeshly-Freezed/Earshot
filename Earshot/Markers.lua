@@ -1,9 +1,9 @@
 -- Markers.lua: a small speech bubble over the NPC who's talking.
 --
--- It sits on the NPC's nameplate, so it shows when the NPC has one: with Follow speakers by
--- nameplate on, or with friendly NPC nameplates switched on yourself. An NPC is talking while
--- Spoken plays its voice, and (with Also NPCs talking without a voice) for a while after it
--- says something in chat, which covers the game's own lines that Spoken has no voice for.
+-- It sits on the NPC's nameplate, so it shows when the NPC has one: with friendly NPC
+-- nameplates on in the game's options. An NPC is talking while Spoken plays its voice, and
+-- (with Also NPCs talking without a voice) for a while after it says something in chat, which
+-- covers the game's own lines that Spoken has no voice for.
 local _, ns = ...
 local Plain = ns.Plain
 

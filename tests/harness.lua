@@ -252,36 +252,6 @@ local function NewClient(opts)
             return list
         end,
     }
-    -- A fake LibRangeCheck that answers the way the real one does on Forever (its friendRC,
-    -- friendNoItemsRC and miscRC lists). For an NPC you can assist: its 5 yd item check plus
-    -- your class's friendly spells (H.friendSpells: none for a rogue, { 30, 40 } for a
-    -- priest). Told to leave items out (the third argument), or for an NPC you can't assist:
-    -- the interaction distances, 8 and 28 yd, plus those spells if you can assist it.
-    H.friendSpells = {}
-    local ITEM, INTERACT = { 5 }, { 8, 28 }
-    local RangeCheck = {
-        GetRange = function(_, token, _, noItems)
-            local guid = NPCOf(token)
-            if not guid then return nil end
-            local assist = H.npcs[guid].assist
-            local steps = {}
-            for _, step in ipairs((assist and not noItems) and ITEM or INTERACT) do table.insert(steps, step) end
-            if assist then
-                for _, step in ipairs(H.friendSpells) do table.insert(steps, step) end
-            end
-            table.sort(steps)
-            local distance = Relative(guid)
-            local low = 0
-            for _, step in ipairs(steps) do
-                if distance <= step then return low, step end
-                low = step
-            end
-            return low, nil
-        end,
-    }
-    rawset(env, "LibStub", setmetatable({}, {
-        __call = function(_, name) if name == "LibRangeCheck-3.0" then return RangeCheck end end,
-    }))
     function H.ShowPlate(guid, kind)
         H.plateCount = H.plateCount + 1
         local token = "nameplate" .. H.plateCount
@@ -674,6 +644,7 @@ local function NewClient(opts)
     for name, value in pairs(opts.cvars or {}) do H.cvars[name] = value end
 
     H.env = env
+    H.inCombat = opts.inCombat
     H.ns = {}
     for _, file in ipairs(TocFiles()) do
         local chunk, err = loadstring(ReadFile(ADDON_DIR .. "/" .. file), "@" .. file)
@@ -721,8 +692,8 @@ scenario("loads cleanly and registers settings", function()
     check(#H.settings.categories == 1 and H.settings.addonCategory ~= nil, "settings category registered")
     local count = { slider = 0, checkbox = 0, dropdown = 0, button = 0 }
     for _, c in ipairs(H.settings.controls) do count[c.kind] = count[c.kind] + 1 end
-    check(count.slider == 6 and count.checkbox == 10 and count.dropdown == 2 and count.button == 3,
-        "6 sliders, 10 checkboxes, 2 dropdowns, 3 buttons",
+    check(count.slider == 6 and count.checkbox == 7 and count.dropdown == 2 and count.button == 3,
+        "6 sliders, 7 checkboxes, 2 dropdowns, 3 buttons",
         count.slider .. "/" .. count.checkbox .. "/" .. count.dropdown .. "/" .. count.button)
     check(H.env.SlashCmdList.EARSHOT ~= nil, "slash command registered")
     check(H.LastChat():find("fade as you walk away") ~= nil, "welcome line printed once")
@@ -1174,7 +1145,6 @@ scenario("game sound checkboxes write the game's own options", function()
 end)
 
 local FARMER = "Creature-0-1-2-3-300-0000CCCC"
-local function Follow(H, on) H.settings.registered.EARSHOT_FOLLOW:SetValue(on) end
 
 -- How a nameplate looks: "name only" (bars, auras and highlights see-through; its name and
 -- interact icon showing), "as the game left it", or "something else".
@@ -1191,293 +1161,46 @@ local function Looks(plate)
     return "something else"
 end
 
-scenario("following is off until you switch it on", function()
+scenario("nameplates are left alone", function()
     local H = NewClient({ spoken = "Ambience" })
     check(H.cvars.nameplateShowFriendlyNpcs == "0" and H.cvars.nameplateShowAll == "0", "game's nameplate options untouched")
     H.npcs[FARMER] = { north = 10, west = 0 }
     local _, plate = H.ShowPlate(FARMER)
     check(Looks(plate) == "as the game left it" and plate.clickable, "friendly NPC nameplates left as they are")
+    check(H.ns.db.follow == nil and H.ns.db.hidePlates == nil and H.ns.db.titles == nil, "no following settings")
 end)
 
-scenario("switching following on turns nameplates on and hides friendly NPCs' ones", function()
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    check(H.cvars.nameplateShowFriendlyNpcs == "1" and H.cvars.nameplateShowAll == "1",
-        "Friendly NPC and Always Show nameplates on")
-    check(H.ns.char.plateOptions.nameplateShowFriendlyNpcs == "0" and H.ns.char.plateOptions.nameplateShowAll == "0",
-        "your old values kept, per character")
-    H.npcs[FARMER] = { north = 10, west = 0 }
-    local _, npc = H.ShowPlate(FARMER, "npc")
-    local _, enemy = H.ShowPlate("Creature-0-1-2-3-400-0000DDDD", "enemy")
-    local _, mate = H.ShowPlate("Player-1-0ABCDEF", "player")
-    local _, pet = H.ShowPlate("Pet-0-1-2-3-500-0000EEEE", "pet")
-    check(Looks(npc) == "name only" and not npc.clickable, "friendly NPC nameplate shows only its name, unclickable",
-        Looks(npc))
-    check(Looks(enemy) == "as the game left it" and enemy.clickable, "enemy nameplate untouched")
-    check(Looks(mate) == "as the game left it" and mate.clickable, "player nameplate untouched")
-    check(Looks(pet) == "as the game left it" and pet.clickable, "pet nameplate untouched")
-    npc.UnitFrame:UpdateHitTestArea(H.env.NamePlateSetupOptions)
-    check(not npc.clickable, "stays unclickable when the game redraws its clickable area")
-    H.RemovePlate(npc.unitToken)
-    local _, reused = H.ShowPlate("Creature-0-1-2-3-600-0000FFFF", "enemy")
-    check(reused.UnitFrame == npc.UnitFrame, "(the game reused its visible part)")
-    check(Looks(reused) == "as the game left it" and reused.clickable, "reused for an enemy: as before, and clickable")
-    check(#H.errors == 0, "no errors", H.errors[1])
-end)
-
-scenario("hidden friendly NPC nameplates keep their names", function()
-    -- Once an NPC has a nameplate the game shows its name there, not above its head.
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    H.npcs[FARMER] = { north = 10, west = 0 }
-    local _, npc = H.ShowPlate(FARMER)
-    local face = npc.UnitFrame
-    check(Looks(npc) == "name only", "only the name shows", Looks(npc))
-    check(face.RaidTargetFrame.alpha == 1 and face.WidgetContainer.alpha == 1,
-        "a raid marker or the game's widgets would still show")
-    face:SetAlpha(1) -- the game sets the whole nameplate back to visible now and then
-    check(Looks(npc) == "name only", "still only the name after the game resets it")
-    H.Fire("NAME_PLATE_UNIT_ADDED", npc.unitToken) -- set up again for the same NPC
-    H.settings.registered.EARSHOT_HIDEPLATES:SetValue(false)
-    check(Looks(npc) == "as the game left it", "untick Hide: bars and highlights as they were",
-        ("selection %.2f, flash %.2f"):format(face.selectionHighlight.alpha, face.aggroFlash.alpha))
-    check(#H.errors == 0, "no errors", H.errors[1])
-end)
-
-scenario("switching following off puts everything back", function()
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    H.npcs[FARMER] = { north = 10, west = 0 }
-    local _, npc = H.ShowPlate(FARMER)
-    Follow(H, false)
-    check(H.cvars.nameplateShowFriendlyNpcs == "0" and H.cvars.nameplateShowAll == "0", "your nameplate options back")
-    check(next(H.ns.char.plateOptions) == nil, "nothing left waiting to be restored")
-    check(Looks(npc) == "as the game left it" and npc.clickable, "the hidden nameplate shows again, clickable")
-    local J = NewClient({ spoken = "Ambience", cvars = { nameplateShowFriendlyNpcs = "1", nameplateShowAll = "1" } })
-    Follow(J, true)
-    Follow(J, false)
-    check(J.cvars.nameplateShowFriendlyNpcs == "1" and J.cvars.nameplateShowAll == "1", "options you already had on stay on")
-    local K = NewClient({ spoken = "Ambience" })
-    Follow(K, true)
-    K.settings.registered.EARSHOT_HIDEPLATES:SetValue(false)
-    K.npcs[FARMER] = { north = 10, west = 0 }
-    local _, shown = K.ShowPlate(FARMER)
-    check(Looks(shown) == "as the game left it", "untick Hide and friendly NPC nameplates show")
-    check(K.cvars.nameplateShowFriendlyNpcs == "1", "following still uses them")
-    local L = NewClient({ spoken = "Ambience" })
-    Follow(L, true)
-    L.Slash("off")
-    check(L.cvars.nameplateShowFriendlyNpcs == "0", "/earshot off also puts your nameplate options back")
-end)
-
-scenario("nameplate options wait until combat ends", function()
-    local H = NewClient({ spoken = "Ambience" })
-    H.inCombat = true
-    Follow(H, true)
-    check(H.cvars.nameplateShowFriendlyNpcs == "0" and #H.errors == 0, "nothing changed in combat, no error")
-    H.inCombat = false
-    H.Fire("PLAYER_REGEN_ENABLED")
-    check(H.cvars.nameplateShowFriendlyNpcs == "1" and H.cvars.nameplateShowAll == "1", "applied once combat ends")
-end)
-
-scenario("in combat your own nameplate options are back", function()
-    -- Following pauses in combat, so Earshot hands the options back as combat starts (the
-    -- game still allows it then) and takes them again when it ends. An addon that switches
-    -- enemy nameplates with combat, like Leatrix Plus's Combat plates, is left to it.
-    local H = NewClient({ spoken = "Ambience", cvars = { nameplateShowEnemies = "0" } })
-    Follow(H, true)
-    check(H.cvars.nameplateShowFriendlyNpcs == "1" and H.cvars.nameplateShowAll == "1", "on outside combat")
-    H.Fire("PLAYER_REGEN_DISABLED") -- its handlers run just before the lockdown starts
-    H.inCombat = true
-    H.cvars.nameplateShowEnemies = "1" -- Combat plates
-    check(H.cvars.nameplateShowFriendlyNpcs == "0" and H.cvars.nameplateShowAll == "0", "yours during the fight")
-    H.inCombat = false
-    H.Fire("PLAYER_REGEN_ENABLED")
-    H.cvars.nameplateShowEnemies = "0" -- Combat plates
-    check(H.cvars.nameplateShowFriendlyNpcs == "1" and H.cvars.nameplateShowAll == "1", "on again afterwards")
-    local touched = false
-    for _, entry in ipairs(H.cvarLog) do
-        if entry.name == "nameplateShowEnemies" then touched = true end
-    end
-    check(not touched, "never touches the enemy nameplate option")
-    -- Already locked when Earshot hears combat start: they stay on, with no error.
-    H.inCombat = true
-    H.Fire("PLAYER_REGEN_DISABLED")
-    H.inCombat = false
-    H.Fire("PLAYER_REGEN_ENABLED")
-    check(H.cvars.nameplateShowAll == "1" and #H.errors == 0, "no harm if it's too late", H.errors[1])
-    -- Switched off mid-fight: nothing comes back on afterwards.
-    H.Fire("PLAYER_REGEN_DISABLED")
-    H.inCombat = true
-    Follow(H, false)
-    H.inCombat = false
-    H.Fire("PLAYER_REGEN_ENABLED")
-    check(H.cvars.nameplateShowFriendlyNpcs == "0" and H.cvars.nameplateShowAll == "0"
-        and next(H.ns.char.plateOptions) == nil, "switched off in combat stays off")
-end)
-
-scenario("following chatter: walking past the NPC who spoke", function()
-    -- The farmer is 15 yd ahead. Pinned where you stood, his voice fades as you walk past him;
-    -- following finds him by his nameplate.
-    local function Walk(H)
-        H.MoveTo(0, 0, 0)
-        H.npcs[FARMER] = { north = 15, west = 0 }
-        H.ShowPlate(FARMER)
-        H.Fire("CHAT_MSG_MONSTER_SAY", "Lovely day for it.", "Farmer")
-        H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "Lovely day for it.", key = "c-walk" }))
-        for north = 0, 32, 2 do
-            H.MoveTo(north, 0, 0)
-            H.Advance(0.4)
-        end
-    end
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    Walk(H)
-    local spot = H.ns.Spatial.session.spot
-    local off = math.sqrt((spot.north - 15) ^ 2 + spot.west ^ 2)
-    check(off < 6, "Earshot's spot within 6 yd of the farmer", ("%.1f yd off"):format(off))
-    -- 17 yd past him: inside chatter's 20 yd of full volume, so the only softening is "behind you",
-    -- which applies now that following knows which way he is.
-    local estimate = math.sqrt((spot.north - H.player.north) ^ 2 + (spot.west - H.player.west) ^ 2)
-    local weight = math.min(1, math.max(0, (estimate - 10) / 10))
-    local expected = 0.8 * (1 - weight * 0.35)
-    check(spot.directional, "following knows which way he is")
-    check(near(H.Vol("Ambience"), expected, 0.02), "no fade for distance, just softer behind you",
-        H.Vol("Ambience") .. " vs " .. expected)
-    local J = NewClient({ spoken = "Ambience" })
-    Walk(J)
-    check(J.Vol("Ambience") < 0.5, "without following it fades (pinned 32 yd back)", J.Vol("Ambience"))
-    check(#H.errors == 0, "no errors", H.errors[1])
-end)
-
-scenario("following an NPC who walks with you", function()
-    local ESCORT = "Creature-0-1-2-3-700-0000ABAB"
-    local function Escort(H)
-        H.MoveTo(0, 0, 0)
-        H.TalkTo(ESCORT, "Escort")
-        H.npcs[ESCORT] = { north = 3, west = 0 }
-        H.ShowPlate(ESCORT)
-        H.Spoken("CLIP_STARTED", H.Clip("quests", ESCORT, { key = "escort-1" }))
-        H.CloseWindow()
-        for north = 0, 40, 2 do
-            H.MoveTo(north, 0, 0)
-            H.npcs[ESCORT].north = north + 3
-            H.Advance(0.4)
-        end
-    end
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    Escort(H)
-    check(H.Vol("Ambience") > 0.7, "40 yd on, the escort is still beside you: near full volume", H.Vol("Ambience"))
-    local J = NewClient({ spoken = "Ambience" })
-    Escort(J)
-    check(J.Vol("Ambience") < 0.05, "without following, the voice stays where you met them", J.Vol("Ambience"))
-end)
-
-scenario("following uses every range step the library has", function()
-    -- For an NPC you can assist, LibRangeCheck's usual answer only has its 5 yd item check.
-    -- The 8 and 28 yd steps come from asking it to leave items out, so Earshot asks both ways.
-    local function Hear(H, north)
-        Follow(H, true)
-        H.MoveTo(0, 0, 0)
-        H.npcs[FARMER] = { north = north, west = 0, assist = true }
-        H.ShowPlate(FARMER)
-        H.Fire("CHAT_MSG_MONSTER_SAY", "Mind the step.", "Farmer")
-        H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "Mind the step.", key = "c-steps" }))
-        H.Advance(0.5)
-        local seen = H.ns.Spatial.session.seen
-        return seen and seen.low, seen and seen.high
-    end
-    local H = NewClient({ spoken = "Ambience" })
-    local low, high = Hear(H, 15)
-    check(low == 8 and high == 28, "a rogue 15 yd away: 8-28 yd, not just 'over 5'", tostring(low) .. "-" .. tostring(high))
-    H.MoveTo(12, 0, 0)
-    H.Advance(0.5)
-    H.Slash("status")
-    check(table.concat(H.chat, "\n"):find("Following its nameplate: within 5 yd.", 1, true) ~= nil,
-        "3 yd away: within 5 yd")
-    local P = NewClient({ spoken = "Ambience" })
-    P.friendSpells = { 30, 40 }
-    low, high = Hear(P, 35)
-    check(low == 30 and high == 40, "a priest's heals and buffs add 30 and 40 yd", tostring(low) .. "-" .. tostring(high))
-    local N = NewClient({ spoken = "Ambience" })
-    low, high = Hear(N, 15)
-    N.npcs[FARMER].assist = false
-    N.MoveTo(-20, 0, 0)
-    N.Advance(0.5)
-    low, high = N.ns.Spatial.session.seen.low, N.ns.Spatial.session.seen.high
-    check(low == 28 and high == nil, "an NPC you can't assist: past 28 yd", tostring(low) .. "-" .. tostring(high))
-    check(#H.errors + #P.errors + #N.errors == 0, "no errors")
-end)
-
-scenario("in combat a voice Earshot was following keeps its volume", function()
-    -- Escorts get attacked: the NPC fights beside you, but Earshot can't follow it in combat.
-    local ESCORT = "Creature-0-1-2-3-700-0000ABAB"
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    H.MoveTo(0, 0, 0)
-    H.TalkTo(ESCORT, "Escort")
-    H.npcs[ESCORT] = { north = 3, west = 0 }
-    local token = H.ShowPlate(ESCORT)
-    H.Spoken("CLIP_STARTED", H.Clip("quests", ESCORT, { key = "escort-fight" }))
-    H.CloseWindow()
-    for north = 0, 20, 2 do
-        H.MoveTo(north, 0, 0)
-        H.npcs[ESCORT].north = north + 3
-        H.Advance(0.4)
-    end
-    local before = H.Vol("Ambience")
-    H.Fire("PLAYER_REGEN_DISABLED")
-    H.inCombat = true
-    H.RemovePlate(token) -- friendly NPC nameplates go for the fight
-    for north = 22, 80, 2 do -- the fight moves on, and the escort with you
-        H.MoveTo(north, 0, 0)
-        H.npcs[ESCORT].north = north + 3
-        H.Advance(0.2)
-    end
-    check(before > 0.7 and near(H.Vol("Ambience"), before, 0.005), "the voice keeps playing at its volume",
-        before .. " then " .. H.Vol("Ambience"))
-    H.Slash("status")
-    check(table.concat(H.chat, "\n"):find("stays at this volume until the fight ends", 1, true) ~= nil,
-        "status says why")
-    H.inCombat = false
-    H.Fire("PLAYER_REGEN_ENABLED")
-    H.ShowPlate(ESCORT)
-    H.Advance(1)
-    check(H.Vol("Ambience") > 0.7, "after the fight following picks up again", H.Vol("Ambience"))
-    -- A quest giver Earshot wasn't following stays where you talked to it: still fades.
-    local J = NewClient({ spoken = "Ambience" })
-    J.TalkTo(NPC)
-    J.Spoken("CLIP_STARTED", J.Clip("quests", NPC, { key = "giver" }))
-    J.CloseWindow()
-    J.Fire("PLAYER_REGEN_DISABLED")
-    J.inCombat = true
-    J.MoveTo(-30, 0, 0)
-    J.Advance(1.5)
-    check(J.Vol("Ambience") < 0.4, "a quest giver's voice still fades as you move in a fight", J.Vol("Ambience"))
-    check(#H.errors + #J.errors == 0, "no errors", H.errors[1] or J.errors[1])
-end)
-
-scenario("following waits out combat, and keeps the last spot when the nameplate goes", function()
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    H.MoveTo(0, 0, 0)
-    H.npcs[FARMER] = { north = 15, west = 0 }
-    local token = H.ShowPlate(FARMER)
-    H.Fire("CHAT_MSG_MONSTER_SAY", "Mind the crops.", "Farmer")
-    H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "Mind the crops.", key = "c-combat" }))
-    H.inCombat = true
-    H.Advance(1)
-    local spot = H.ns.Spatial.session.spot
-    check(spot.north == 0 and spot.west == 0 and spot.guess, "in combat the guess stays put")
-    H.inCombat = false
-    H.Advance(0.5)
-    check(not spot.guess and spot.north > 10, "after combat the nameplate fixes it", ("north %.1f"):format(spot.north))
-    H.RemovePlate(token)
-    local before = spot.north
-    H.MoveTo(-20, 0, 0)
-    H.Advance(1)
-    check(spot.north == before, "no nameplate: Earshot keeps where it last saw the NPC")
+scenario("nameplate options Earshot 0.3 changed for following come back", function()
+    -- 0.3 with following on: it turned both options on and kept this character's own.
+    local H = NewClient({ spoken = "Ambience",
+        db = { follow = true, hidePlates = true, titles = true },
+        charDB = { plateOptions = { nameplateShowFriendlyNpcs = "0", nameplateShowAll = "0" } },
+        cvars = { nameplateShowFriendlyNpcs = "1", nameplateShowAll = "1" } })
+    check(H.cvars.nameplateShowFriendlyNpcs == "0" and H.cvars.nameplateShowAll == "0",
+        "both back as you had them when 0.4 loads")
+    check(H.env.EarshotCharDB.plateOptions == nil, "and nothing left to put back")
+    check(H.ns.db.follow == nil and H.ns.db.hidePlates == nil and H.ns.db.titles == nil, "the old settings are cleared")
+    -- One you switched off yourself since, and one you switched on yourself before: yours stay.
+    local J = NewClient({ spoken = "Ambience",
+        charDB = { plateOptions = { nameplateShowFriendlyNpcs = "0" } },
+        cvars = { nameplateShowFriendlyNpcs = "0", nameplateShowAll = "1" } })
+    check(J.cvars.nameplateShowFriendlyNpcs == "0" and J.cvars.nameplateShowAll == "1", "your own changes stay")
+    -- A /reload in combat: the game locks nameplate options until the fight ends.
+    local K = NewClient({ spoken = "Ambience", inCombat = true,
+        charDB = { plateOptions = { nameplateShowFriendlyNpcs = "0", nameplateShowAll = "0" } },
+        cvars = { nameplateShowFriendlyNpcs = "1", nameplateShowAll = "1" } })
+    check(K.cvars.nameplateShowFriendlyNpcs == "1" and K.env.EarshotCharDB.plateOptions ~= nil,
+        "in combat it waits")
+    K.inCombat = false
+    K.Fire("PLAYER_REGEN_ENABLED")
+    check(K.cvars.nameplateShowFriendlyNpcs == "0" and K.cvars.nameplateShowAll == "0", "and puts them back after it")
+    K.cvars.nameplateShowAll = "1"
+    K.inCombat = true
+    K.Fire("PLAYER_REGEN_DISABLED")
+    K.inCombat = false
+    K.Fire("PLAYER_REGEN_ENABLED")
+    check(K.cvars.nameplateShowAll == "1", "once only: after that, nameplate options are yours")
+    check(#H.errors + #J.errors + #K.errors == 0, "no errors", H.errors[1] or J.errors[1] or K.errors[1])
 end)
 
 local GUARD = "Creature-0-1-2-3-600-0000FFFF"
@@ -1894,7 +1617,6 @@ end)
 
 scenario("who's talking: a bubble over the NPC", function()
     local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
     H.npcs[FARMER] = { north = 10, west = 0 }
     local _, plate = H.ShowPlate(FARMER)
     local M = H.ns.Markers
@@ -1925,7 +1647,6 @@ scenario("who's talking: a bubble over the NPC", function()
     H.settings.registered.EARSHOT_MARKERS:SetValue(true)
     check(M:Showing(FARMER), "back on mid-line: there it is")
     local J = NewClient({ spoken = "Ambience" })
-    Follow(J, true)
     J.npcs[FARMER] = { north = 10, west = 0 }
     J.Spoken("CLIP_STARTED", J.Clip("chatter", FARMER, { text = "Over here.", key = "m3" }))
     check(not J.ns.Markers:Showing(FARMER), "no nameplate, no bubble")
@@ -1936,82 +1657,31 @@ scenario("who's talking: a bubble over the NPC", function()
     check(#H.errors + #J.errors == 0, "no errors", H.errors[1] or J.errors[1])
 end)
 
-scenario("NPC titles under the names on hidden nameplates", function()
-    local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
-    H.npcs[FARMER] = { north = 10, west = 0, title = "Stable Master" }
-    local _, plate = H.ShowPlate(FARMER)
-    local face = plate.UnitFrame
-    local title = face.fontStrings and face.fontStrings[1]
-    check(title and title.shown and title.text == "<Stable Master>", "the title shows", title and title.text)
-    check(title.points[1][1] == "TOP" and title.points[1][2] == face.name and title.points[1][3] == "BOTTOM",
-        "just under the name")
-    check(title.tint and title.tint[1] == 0.1 and title.tint[2] == 1 and title.font ~= nil,
-        "tinted like the name, in its font")
-    local reads = H.tooltipReads
-    H.npcs["Creature-0-1-2-3-300-0000CCCD"] = { north = 11, west = 0, title = "Stable Master" }
-    H.ShowPlate("Creature-0-1-2-3-300-0000CCCD")
-    check(H.tooltipReads == reads, "looked up once for each kind of NPC")
-    local PLAIN = "Creature-0-1-2-3-400-0000DDDD"
-    H.npcs[PLAIN] = { north = 12, west = 0 }
-    local _, other = H.ShowPlate(PLAIN)
-    local otherTitle = other.UnitFrame.fontStrings and other.UnitFrame.fontStrings[1]
-    check(not (otherTitle and otherTitle.shown), "an NPC with only a level line has no title")
-    local BANKER = "Creature-0-1-2-3-500-0000EEEE"
-    H.npcs[BANKER] = { north = 14, west = 0, title = "<Banker>" }
-    local _, bank = H.ShowPlate(BANKER)
-    local bankTitle = bank.UnitFrame.fontStrings and bank.UnitFrame.fontStrings[1]
-    check(bankTitle and bankTitle.text == "<Banker>", "a title already in brackets isn't doubled",
-        bankTitle and bankTitle.text)
-    face.name.shown = false
-    H.env.CompactUnitFrame_UpdateName(face)
-    check(not title.shown, "the game hides the name (your name settings): the title goes too")
-    face.name.shown = true
-    H.env.CompactUnitFrame_UpdateName(face)
-    check(title.shown, "and comes back with it")
-    H.settings.registered.EARSHOT_TITLES:SetValue(false)
-    check(not title.shown, "Show NPC titles off")
-    H.settings.registered.EARSHOT_TITLES:SetValue(true)
-    check(title.shown, "and on")
-    H.settings.registered.EARSHOT_HIDEPLATES:SetValue(false)
-    check(not title.shown, "nameplates shown in full: no extra line")
-    check(#H.errors == 0, "no errors", H.errors[1])
-end)
-
 scenario("status, the minimap addon menu and the settings layout", function()
     local H = NewClient({ spoken = "Ambience" })
-    Follow(H, true)
     H.MoveTo(0, 0, 0)
-    H.npcs[FARMER] = { north = 15, west = 0, assist = true }
-    H.ShowPlate(FARMER)
     H.Fire("CHAT_MSG_MONSTER_SAY", "Fine weather.", "Farmer")
     H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "Fine weather.", key = "c-status" }))
+    H.MoveTo(-15, 0, 0)
     H.Advance(0.5)
+    local before = #H.chat
     H.Slash("status")
-    local said = table.concat(H.chat, "\n")
-    check(said:find("Following speakers by nameplate, with friendly NPC nameplates showing only their names", 1, true)
-        ~= nil,
-        "status says following is on")
-    check(said:find("Following its nameplate: 8-28 yd away", 1, true) ~= nil, "status gives the nameplate's distance",
-        said:match("Following its[^\n]*") or "nothing")
+    local said = table.concat(H.chat, "\n", before + 1)
+    check(said:find("Placing a voice 15 yd away", 1, true) ~= nil, "status says where the voice is",
+        said:match("Placing[^\n]*") or "nothing")
+    check(said:find("ollowing", 1, true) == nil and said:find("nameplate", 1, true) == nil,
+        "and nothing about following", said)
     H.env.Earshot_OnAddonCompartmentClick("Earshot", "LeftButton")
     check(H.settings.opened == 1, "the minimap addon menu opens Earshot's settings")
     H.env.Earshot_OnAddonCompartmentEnter("Earshot", {})
     check(H.tooltipShown == true, "hovering it shows a tooltip")
     H.env.Earshot_OnAddonCompartmentLeave("Earshot", {})
     check(H.tooltipShown == false, "and hides it again")
-    local hide
-    for _, c in ipairs(H.settings.controls) do
-        if c.setting and c.setting.variable == "EARSHOT_HIDEPLATES" then hide = c.initializer end
-    end
-    check(hide and hide.indented and hide.parent and hide.parent.setting.variable == "EARSHOT_FOLLOW",
-        "Hide sits indented under Follow speakers")
     local function Parent(variable)
         local c = Control(H, variable)
         return c and c.initializer and c.initializer.indented and c.initializer.parent
             and c.initializer.parent.setting.variable
     end
-    check(Parent("EARSHOT_TITLES") == "EARSHOT_HIDEPLATES", "Show NPC titles sits under Hide")
     check(Parent("EARSHOT_CHATTERRANGE") == "EARSHOT_CHATTER" and Parent("EARSHOT_YELLRANGE") == "EARSHOT_CHATTER",
         "the chatter and yell ranges sit under World chatter")
     check(Parent("EARSHOT_MARKSILENT") == "EARSHOT_MARKERS", "the chat bubbles option sits under Mark who's talking")
@@ -2084,11 +1754,11 @@ scenario("the settings page", function()
         if row.kind == "header" then table.insert(headers, row.header) end
         if Variable(row) == "EARSHOT_AWAY" then awayUnder = headers[#headers] end
     end
-    check(table.concat(headers, " / ") == "Distance / Voices to place / Follow the speaker / Who's talking / "
+    check(table.concat(headers, " / ") == "Distance / Voices to place / Who's talking / "
         .. "The game's own sounds / Test and setup", "the page's sections", table.concat(headers, " / "))
     check(awayUnder == "Distance", "When you walk out of earshot sits with the distances", awayUnder)
     -- Switched off, Earshot's own rows grey out; the game's options and the buttons don't.
-    local switches = { "EARSHOT_ENABLED", "EARSHOT_CHATTER", "EARSHOT_FOLLOW", "EARSHOT_HIDEPLATES", "EARSHOT_MARKERS" }
+    local switches = { "EARSHOT_ENABLED", "EARSHOT_CHATTER", "EARSHOT_MARKERS" }
     for _, variable in ipairs(switches) do H.settings.registered[variable]:SetValue(true) end
     local grey
     for _, row in ipairs(H.settings.page) do
@@ -2132,11 +1802,11 @@ scenario("the settings page", function()
     H.cvars.Sound_EnablePositionalLowPassFilter = "0"
     H.settings.registered.EARSHOT_FULL:SetValue(20)
     H.settings.registered.EARSHOT_AWAY:SetValue("skip")
-    H.settings.registered.EARSHOT_FOLLOW:SetValue(true)
+    H.settings.registered.EARSHOT_MARKERS:SetValue(false)
     for _, setting in pairs(H.settings.registered) do setting:SetValueToDefault() end
     check(H.cvars.Sound_EnableReverb == "0" and H.cvars.Sound_EnablePositionalLowPassFilter == "0",
         "Defaults leaves the game's own sound options alone")
-    check(H.ns.db.full == H.ns.DEFAULTS.full and H.ns.db.away == "quiet" and H.ns.db.follow == false,
+    check(H.ns.db.full == H.ns.DEFAULTS.full and H.ns.db.away == "quiet" and H.ns.db.markers == true,
         "and puts Earshot's back")
     -- The minimap addon menu's tooltip says what Earshot is doing.
     H.env.Earshot_OnAddonCompartmentEnter("Earshot", {})
@@ -2152,25 +1822,6 @@ scenario("the settings page", function()
     H.Slash("help")
     check(H.LastChat():find("/earshot test", 1, true) ~= nil, "/earshot help lists the commands", H.LastChat())
     check(#H.errors + #M.errors == 0, "no errors", H.errors[1] or M.errors[1])
-end)
-
-scenario("the bundled libraries", function()
-    for _, file in ipairs({ "Libs/LibStub/LibStub.lua", "Libs/LibRangeCheck-3.0/LibRangeCheck-3.0.lua" }) do
-        local chunk, err = loadstring(ReadFile(ADDON_DIR .. "/" .. file), "@" .. file)
-        check(chunk ~= nil, file .. " has no syntax errors", err)
-    end
-    local env = { assert = assert, tonumber = tonumber, string = string, error = error,
-        setmetatable = setmetatable, pairs = pairs, type = type, tostring = tostring }
-    env._G = env
-    local chunk = loadstring(ReadFile(ADDON_DIR .. "/Libs/LibStub/LibStub.lua"))
-    setfenv(chunk, env)
-    chunk()
-    local lib = env.LibStub:NewLibrary("Test-1.0", 1)
-    check(type(lib) == "table" and env.LibStub("Test-1.0") == lib, "LibStub works")
-    local toc = ReadFile(ADDON_DIR .. "/Earshot.toc")
-    local stub, range, first = toc:find("Libs\\LibStub", 1, true), toc:find("Libs\\LibRangeCheck", 1, true),
-        toc:find("Math.lua", 1, true)
-    check(stub and range and first and stub < range and range < first, "the TOC loads LibStub, then LibRangeCheck, first")
 end)
 
 for _, s in ipairs(scenarios) do

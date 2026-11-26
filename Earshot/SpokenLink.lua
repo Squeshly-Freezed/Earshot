@@ -6,9 +6,8 @@
 --
 --   quests, gossip   the NPC whose window you opened: placed where it stood
 --   chatter          an NPC talking nearby. The game doesn't say where it stands, so the
---                    voice is pinned where you were when the NPC spoke, until its nameplate
---                    says otherwise. Yells carry further (Yells heard up to). Whispers are
---                    said to you, so they play as normal
+--                    voice is pinned where you were when the NPC spoke. Yells carry further
+--                    (Yells heard up to). Whispers are said to you, so they play as normal
 --   anything else    zone stories, books and dungeon voices play as normal
 --
 -- A line you replay or start from a distance plays as normal: Earshot fades a voice you
@@ -56,7 +55,8 @@ local held
 
 local function KeyOf(clip) return clip.key or clip.fileName or clip.path end
 
--- The NPC's own GUID, which its nameplate also has. Spoken's stand-ins don't match one.
+-- The NPC's own GUID (its nameplate has it too, for the speech bubble). Spoken's stand-ins
+-- don't match one.
 local function Speaker(clip)
     local guid = Plain(clip.unitGUID)
     return guid and not Anchors.IsStandIn(guid) and guid or nil
@@ -115,8 +115,7 @@ local function SpotFor(clip, part, replay)
             if kind == "yell" then return spot, { guid = speaker, full = ns.NearPart(range), silent = range } end
             return spot, { guid = speaker }
         end
-        local pin = (said and said.spot) or queued or Anchors:Here(0, false)
-        if pin then pin.guess = true end -- where you were, not where the NPC is: its nameplate can fix that
+        local pin = (said and said.spot) or queued or Anchors:Here(0, false) -- where you were
         return pin, { full = ns.NearPart(range), silent = range, guid = speaker }
     end
     return nil

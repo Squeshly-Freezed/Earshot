@@ -36,9 +36,6 @@ that lists your addons), or type `/earshot`.
 | World chatter | on | NPCs talking around you. |
 | Chatter heard up to | 45 yd | How far from where an NPC spoke its chatter fades out. Full volume within about half of that. |
 | Yells heard up to | 120 yd | The same for yells. At the top of the slider, Anywhere, yells aren't faded. |
-| Follow speakers by nameplate | off | Keeps track of the talking NPC while it speaks. See below. |
-| Hide friendly NPC nameplates | on | While following, friendly NPC nameplates show only their names, and can't be clicked. |
-| Show NPC titles | on | Titles such as `<Stable Master>` under those names. |
 | Mark who's talking | on | A speech bubble over the NPC who's talking. See below. |
 | Also NPCs talking without a voice | on | The bubble for lines that only show in chat too. |
 
@@ -100,55 +97,22 @@ Commands: `/earshot test`, `/earshot status`, `/earshot spoken`, `/earshot on`, 
 - Zone stories, books and dungeon voices play as normal: they come from no one standing
   anywhere.
 
-## Following the speaker
+## Where a voice comes from
 
-Without it, Earshot places a voice once: where the NPC stood when you talked to it, or for
-world chatter, where you were when the NPC spoke. With **Follow speakers by nameplate**
-on, it keeps checking the talking NPC's nameplate while the line plays:
+The game won't tell addons where an NPC stands. So Earshot places a voice where the NPC
+stood when you talked to it, and world chatter where you were when the NPC spoke. An NPC
+who walks off while it talks (an escort, say) is still heard from where it started.
 
-- **How far away it is.** The game won't give addons an NPC's position, but it will
-  answer "is it within X yards?" for a few distances. Earshot asks through
-  [LibRangeCheck-3.0](https://www.curseforge.com/wow/addons/librangecheck-3-0): 8 and 28
-  yards, 5 for NPCs that can be healed or buffed, and, if your class has healing or buff
-  spells, as far as those reach (often 30 and 40). Between those steps Earshot keeps its
-  own estimate, so it knows roughly where the NPC is, not exactly.
-- **Which way.** Where the nameplate sits on screen, and whether the game says the NPC is
-  behind the camera. This is used while you're moving or holding the right mouse button,
-  when the camera faces where your character does.
-
-So chatter is no longer stuck where you heard it, and an NPC who walks with you (an
-escort) stays in earshot.
-
-To have nameplates to read, following turns on two of the game's options while you're out
-of combat: **Friendly NPC nameplates**, and **Always Show Nameplates** (with it off, out of
-combat only your target has a nameplate). With **Hide friendly NPC nameplates** on,
-Earshot then hides everything on friendly NPC nameplates except their names, and makes
-them unclickable. Once an NPC has a nameplate, the game shows its name there instead of
-above its head, so that's where NPC names come from now. They still follow your NPC name
-settings. Nameplates don't show titles such as `<Stable Master>`, so **Show NPC titles**
-adds them underneath, read from the NPC's tooltip.
-
-Enemy and player nameplates aren't touched, but Always Show does mean enemy nameplates
-also show outside combat, unless something switches them off then: Leatrix Plus's
-**Combat plates** does, and works as before alongside Earshot.
-
-Following pauses in combat, because the game blocks the distance checks on friendly NPCs
-then. Spoken keeps talking: a voice Earshot was following stays at the volume it had when
-the fight started (the NPC may be an escort fighting beside you), and following picks up
-again when the fight ends. A quest giver Earshot wasn't following stays where you talked
-to it, so its voice still fades as you move. As a fight starts, your own nameplate
-settings also come back until it ends. Switch following off and they come back for good.
-The game saves nameplate options per character, so Earshot remembers yours per character
-too.
-
-Following only works outdoors. If a nameplate addon such as Plater draws your
-nameplates, hide friendly NPCs in its settings instead. Following still works.
+Earshot 0.3 could also follow the talking NPC by its nameplate. It guessed wrong too often,
+so it's gone. If you had it on, the nameplate options it turned on (Friendly NPC nameplates
+and Always Show Nameplates) go back to how you had them, the first time 0.4 loads on each
+character.
 
 ## Who's talking
 
 With **Mark who's talking** on, a small speech bubble sits over the NPC whose voice is
-playing. It goes on the NPC's nameplate, so it needs one: with Follow speakers by
-nameplate on, or with friendly NPC nameplates switched on yourself.
+playing. It goes on the NPC's nameplate, so it needs one: switch on friendly NPC
+nameplates in the game's options.
 
 **Also NPCs talking without a voice** puts the bubble over NPCs whose words only show in
 chat too, including the game's own lines that Spoken has no voice for. The game doesn't
@@ -186,11 +150,10 @@ hasn't seen). Optional fields `full` and `silent` (yards) override the player's 
 | `Volume.lua` | Borrows one volume slider and always gives it back. |
 | `Anchors.lua` | Notes where each NPC stood when you talked to it. |
 | `Spatial.lua` | Follows you while a voice plays and sets the slider 20 times a second. |
-| `Plates.lua` | Follows the speaker by its nameplate, hides friendly NPC nameplates and adds their titles. |
+| `Plates.lua` | Keeps track of which nameplate is whose, for the speech bubble. |
 | `Markers.lua` | The speech bubble over the NPC who's talking. |
 | `SpokenLink.lua` | Listens to Spoken's lines and chat, and handles walking out of earshot. |
 | `API.lua` | The `Earshot:Place` / `Earshot:Done` functions for other addons. |
 | `Test.lua` | `/earshot test`. |
 | `Options.lua` | The settings page, the minimap addon menu entry and `/earshot`. |
 | `Media/` | The test tune, the minimap icon and the speech bubble. |
-| `Libs/` | LibStub (public domain) and LibRangeCheck-3.0 (MIT, licence included). |

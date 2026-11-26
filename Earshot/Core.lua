@@ -19,9 +19,6 @@ ns.DEFAULTS = {
     chatterRange = 45, -- yards: chatter fades out by this far from where it was said
     yellRange = 120,   -- yards: the same for yells (ns.YELLS_ANYWHERE: yells aren't faded)
     away = "quiet", -- when you walk out of earshot: quiet, skip, skipNpc, skipAll or wait (see SpokenLink)
-    follow = false, -- follow the speaker by its nameplate (changes the game's nameplate options)
-    hidePlates = true, -- while following, friendly NPC nameplates show only their names
-    titles = true,  -- ...with their titles, such as <Stable Master>, under the names
     markers = true, -- mark the NPC that's talking (on its nameplate)
     markSilent = true, -- also NPCs talking in chat without a voice
 }
@@ -112,11 +109,12 @@ events:SetScript("OnEvent", function(_, event, name)
             for key, allowed in pairs(ns.CHOICES) do
                 if not allowed[EarshotDB[key]] then EarshotDB[key] = ns.DEFAULTS[key] end
             end
+            -- Settings for following speakers by nameplate, gone since 0.4.
+            EarshotDB.follow, EarshotDB.hidePlates, EarshotDB.titles = nil, nil, nil
             ns.db = EarshotDB
-            -- Nameplate options are kept per character by the game, so what Earshot changed
-            -- (to put back later) is kept per character too.
+            -- Kept per character: a line held for you to walk back to, and the nameplate options
+            -- Earshot 0.3 changed for following, to put back (see Plates.lua).
             if type(EarshotCharDB) ~= "table" then EarshotCharDB = {} end
-            if type(EarshotCharDB.plateOptions) ~= "table" then EarshotCharDB.plateOptions = {} end
             ns.char = EarshotCharDB
             ns.Volume:RestoreLeftover()
             ns.Options:Register()

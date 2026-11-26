@@ -105,7 +105,7 @@ function Spatial:Begin(spot, channel, options)
     options = options or {}
     self.session = {
         spot = spot, channel = channel, full = options.full, silent = options.silent, kind = options.kind,
-        guid = options.guid, -- the speaker, so its nameplate can be followed
+        guid = options.guid, -- the speaker, if known
         onAway = options.onAway,
     }
     self.returning = false
@@ -170,8 +170,6 @@ function Spatial:Update(dt)
         end
         return
     end
-    ns.Plates:Refine(session) -- move the speaker's spot if its nameplate says otherwise
-    if ns.Plates:Holds(session) then return end -- in combat, a followed voice keeps its volume
     local target = self:Gain(session)
     if target == nil then return end -- hold where we are
     self.level = self.level + (target - self.level) * (1 - math.exp(-dt / FOLLOW))

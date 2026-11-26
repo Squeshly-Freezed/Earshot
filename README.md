@@ -32,9 +32,7 @@ The full guide, with every setting, is in [Earshot/README.md](Earshot/README.md)
   you, and how quiet a voice may get.
 - You choose what happens when you walk out of earshot: keep playing quietly, skip the
   line, skip that NPC's lines, skip every NPC out of earshot, or wait until you come back.
-- It can follow the talking NPC by its nameplate, with friendly nameplates cut down to
-  names and titles.
-- A speech bubble shows who's talking.
+- A speech bubble shows who's talking, on NPC nameplates.
 - Works with Spoken 3.12's Previous and Mute.
 
 ## How it works
@@ -60,8 +58,7 @@ python tools/package.py
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). Earshot includes LibStub (public domain) and
-LibRangeCheck-3.0 (MIT).
+MIT, see [LICENSE](LICENSE).
 
 Earshot is a fan-made addon. It isn't made by Spoken's authors or by Blizzard
 Entertainment.

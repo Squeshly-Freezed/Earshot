@@ -107,7 +107,6 @@ function Options:Register()
             ns.Spatial:Clear()
             ns.SpokenLink:LetGo()
         end
-        ns.Plates:Update()
     end)
 
     -- Presets: the sliders they set match one of them, or it's your own mix.
@@ -178,8 +177,7 @@ function Options:Register()
         "Lines read from an NPC's window. Placed where the NPC stood when you talked to it.")))
     local _, chatterInit = Checkbox("chatter", "World chatter",
         "NPCs talking around you. The game doesn't say where they stand, so the voice stays where you were "
-        .. "when the NPC spoke, unless Follow speakers by nameplate finds the NPC. Whispers are said to you, so "
-        .. "they play as normal.")
+        .. "when the NPC spoke. Whispers are said to you, so they play as normal.")
     Row(chatterInit)
     local chatterRange, chatterRangeInit = Slider("chatterRange", "Chatter heard up to",
         "How far from where an NPC spoke its chatter fades out. Full volume within about half of that.", 5, Yards)
@@ -194,36 +192,10 @@ function Options:Register()
         end)
     Under(Row(yellsInit), chatterInit, function() return db.chatter end)
 
-    Header("Follow the speaker")
-    local follow, followInit = Checkbox("follow", "Follow speakers by nameplate",
-        "Keeps track of the talking NPC while it speaks, from its nameplate: how far away it is, and which way. "
-        .. "Chatter then comes from the NPC rather than from where you heard it, and an NPC who walks with you "
-        .. "stays in earshot.\n\n"
-        .. "Out of combat it turns on the game's Friendly NPC nameplates and Always Show Nameplates (which also "
-        .. "shows enemy nameplates, unless something like Leatrix Plus's Combat plates hides them). Your own "
-        .. "settings come back in combat and when you switch this off.\n\n"
-        .. "Outdoors only. In combat a voice it's following keeps its volume until the fight ends.")
-    Row(followInit)
-    local hide, hideInit = Checkbox("hidePlates", "Hide friendly NPC nameplates",
-        "Friendly NPC nameplates show only the NPC's name, and can't be clicked, so following doesn't fill the "
-        .. "screen with health bars. Names follow your NPC name settings: once an NPC has a nameplate, its name "
-        .. "shows there instead of above its head.\n\n"
-        .. "Enemy and player nameplates aren't touched. With a nameplate addon such as Plater, hide friendly NPCs "
-        .. "in its settings instead.")
-    Under(Row(hideInit), followInit, function() return db.follow end)
-    local titles, titlesInit = Checkbox("titles", "Show NPC titles",
-        "Puts titles such as <Stable Master> under the names, as the game shows them without nameplates. "
-        .. "Read from the NPC's tooltip.")
-    Under(Row(titlesInit), hideInit, function() return db.follow and db.hidePlates end)
-    Hears(titlesInit, "follow") -- its parent is Hide, but it also depends on Follow
-    follow:SetValueChangedCallback(function() ns.Plates:Update() end)
-    hide:SetValueChangedCallback(function() ns.Plates:Update() end)
-    titles:SetValueChangedCallback(function() ns.Plates:Update() end)
-
     Header("Who's talking")
     local markers, markersInit = Checkbox("markers", "Mark who's talking",
         "A small speech bubble over the NPC whose voice is playing. It sits on the NPC's nameplate, so it shows "
-        .. "with Follow speakers by nameplate on, or with friendly NPC nameplates switched on yourself.")
+        .. "when you have friendly NPC nameplates on in the game's options.")
     Row(markersInit)
     local unvoiced, unvoicedInit = Checkbox("markSilent", "Also NPCs talking without a voice",
         "NPC lines that only show in chat, such as the game's own lines Spoken has no voice for. The bubble stays "
@@ -288,10 +260,6 @@ function ns.Status()
     if not ns.PlayerPosition() then
         ns.Print("The game hides positions here, so voices play as normal.")
     end
-    if ns.Plates.Following() then
-        ns.Print("Following speakers by nameplate%s.",
-            db.hidePlates and ", with friendly NPC nameplates showing only their names" or "")
-    end
     local session = ns.Spatial.session
     local info = session and ns.Spatial.info
     if info and info.elsewhere then
@@ -299,8 +267,6 @@ function ns.Status()
     elseif info and info.distance then
         ns.Print("Placing a voice %d yd away%s, at %d%% volume.", math.floor(info.distance + 0.5),
             Where(info.angle), math.floor(ns.Spatial.level * 100 + 0.5))
-        local following = ns.Plates:Describe(session)
-        if following then ns.Print(following) end
     end
     local waiting = ns.SpokenLink:Describe()
     if waiting then ns.Print(waiting) end
@@ -355,7 +321,6 @@ SlashCmdList.EARSHOT = function(input)
             ns.Spatial:Clear()
             ns.SpokenLink:LetGo()
         end
-        ns.Plates:Update()
         if Settings and Settings.NotifyUpdate then Settings.NotifyUpdate("EARSHOT_ENABLED") end
         ns.Print(ns.db.enabled and "On." or "Off.")
     elseif command == "help" or not Options.category then

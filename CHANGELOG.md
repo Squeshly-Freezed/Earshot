@@ -1,7 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
+- Follow speakers by nameplate is gone, with Hide friendly NPC nameplates and Show NPC
+  titles. The game won't tell addons where an NPC stands, so following had to guess from
+  rough distance checks and where the nameplate sat on screen, and it guessed wrong too
+  often: walking away from a quest giver, the voice could stay at one volume. Voices are
+  placed as before: where the NPC stood when you talked to it, and chatter where you were
+  when the NPC spoke.
+- If you had following on, the nameplate options it turned on (Friendly NPC nameplates and
+  Always Show Nameplates) go back to how you had them, the first time 0.4 loads on each
+  character. One you've changed yourself since stays as you have it.
+- The speech bubble over whoever's talking shows when you have friendly NPC nameplates on in
+  the game's options.
+- Earshot no longer includes LibStub or LibRangeCheck-3.0.
 - The author is listed as SqueshlyFreezed, the name used on CurseForge and Buy Me a Coffee.
 - The guide says where to report bugs.
 
