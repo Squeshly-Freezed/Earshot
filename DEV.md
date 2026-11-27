@@ -16,7 +16,8 @@ python tests/run.py
 The scenarios cover walking away, turning around, the gap between lines, lines waiting in
 Spoken's queue, logout, replays, dungeons, chatter (said, yelled and whispered), the
 presets and the other sliders, the test sound, the minimap addon menu and the who's-talking
-bubble, and giving back the nameplate options Earshot 0.3 changed for following (which
+bubble (and what Earshot says when the nameplates it needs are off), and giving back the
+nameplate options Earshot 0.3 changed for following (which
 version 0.4 dropped; its last attempt is on the `following-experiment` branch).
 
 The settings page is checked too: its sections, labels that fit, rows greying out while

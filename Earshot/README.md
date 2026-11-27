@@ -111,8 +111,12 @@ character.
 ## Who's talking
 
 With **Mark who's talking** on, a small speech bubble sits over the NPC whose voice is
-playing. It goes on the NPC's nameplate, so it needs one: switch on friendly NPC
-nameplates in the game's options.
+playing. It goes on the NPC's nameplate, so it needs one: switch on **Friendly NPC
+nameplates** in the game's options (under Nameplates). Out of combat the game shows a
+nameplate only for your target unless **Always Show Nameplates** is on too, so switch that
+on as well to see the bubble over NPCs you haven't clicked on. Earshot doesn't change these
+options itself. If they're off the first time a voice plays, it says so in chat, once, and
+`/earshot status` says so too.
 
 **Also NPCs talking without a voice** puts the bubble over NPCs whose words only show in
 chat too, including the game's own lines that Spoken has no voice for. The game doesn't

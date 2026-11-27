@@ -1,14 +1,50 @@
 -- Markers.lua: a small speech bubble over the NPC who's talking.
 --
--- It sits on the NPC's nameplate, so it shows when the NPC has one: with friendly NPC
--- nameplates on in the game's options. An NPC is talking while Spoken plays its voice, and
--- (with Also NPCs talking without a voice) for a while after it says something in chat, which
--- covers the game's own lines that Spoken has no voice for.
+-- It sits on the NPC's nameplate, so it shows when the NPC has one: with Friendly NPC
+-- nameplates on in the game's options, and out of combat only for your target unless Always
+-- Show Nameplates is on too. Earshot doesn't change those options; it says what's missing (once
+-- when a voice first plays without them, when you tick Mark who's talking, and in
+-- /earshot status). An NPC is talking while Spoken plays its voice, and (with Also NPCs talking
+-- without a voice) for a while after it says something in chat, which covers the game's own
+-- lines that Spoken has no voice for.
 local _, ns = ...
 local Plain = ns.Plain
 
 local Markers = { talking = {} } -- speaker GUID -> { voice = true, chatUntil = time }
 ns.Markers = Markers
+
+--- Which friendly NPCs have a nameplate for the bubble: "all", "target" (out of combat only
+--- your target, without Always Show Nameplates), "none", or nil if this client lacks the option.
+function Markers.Nameplates()
+    local friendly = GetCVar("nameplateShowFriendlyNpcs")
+    if friendly == nil then return nil end
+    if friendly ~= "1" then return "none" end
+    return GetCVar("nameplateShowAll") == "1" and "all" or "target"
+end
+
+--- Why the bubble can't show over every NPC, or nil if it can (or Mark who's talking is off).
+function Markers:Problem()
+    if not (ns.db and ns.db.markers) then return nil end
+    local plates = self.Nameplates()
+    if plates == "none" then
+        return "Mark who's talking puts its bubble on nameplates, and the game's Friendly NPC nameplates "
+            .. "are off. To see it, switch them on in the game's options under Nameplates, with Always "
+            .. "Show Nameplates for NPCs you haven't targeted."
+    elseif plates == "target" then
+        return "Mark who's talking: Always Show Nameplates is off in the game's options, so out of combat "
+            .. "only your target has a nameplate, and only your target gets the bubble."
+    end
+end
+
+-- Mark who's talking is on by default, and does nothing without nameplates. The first time a
+-- voice plays with no friendly NPC nameplates, say why there's no bubble. Once, ever.
+local function HintOnce()
+    local db = ns.db
+    if db.markerHint or Markers.Nameplates() ~= "none" then return end
+    db.markerHint = true
+    ns.Print("To see a speech bubble over whoever's talking, switch on Friendly NPC nameplates in the "
+        .. "game's options (under Nameplates). Don't want it? Untick Mark who's talking in /earshot.")
+end
 
 local ICON = "Interface\\AddOns\\Earshot\\Media\\Speaking"
 local SIZE = 22
@@ -89,6 +125,7 @@ function Markers:Speak(guid, how, seconds)
     self.talking[guid] = talk
     if how == "voice" then
         talk.voice = true
+        if ns.db and ns.db.markers then HintOnce() end
     else
         talk.chatUntil = math.max(talk.chatUntil or 0, GetTime() + seconds)
         C_Timer.After(seconds + 0.05, function() Markers:Update(guid) end)

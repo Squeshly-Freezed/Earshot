@@ -1615,14 +1615,18 @@ scenario("out of earshot: wait until you come back", function()
         H.errors[1] or J.errors[1] or K.errors[1] or L.errors[1] or N.errors[1] or P.errors[1] or Q.errors[1])
 end)
 
+local PLATES_ON = { nameplateShowFriendlyNpcs = "1", nameplateShowAll = "1" }
+
 scenario("who's talking: a bubble over the NPC", function()
-    local H = NewClient({ spoken = "Ambience" })
+    local H = NewClient({ spoken = "Ambience", cvars = PLATES_ON })
     H.npcs[FARMER] = { north = 10, west = 0 }
     local _, plate = H.ShowPlate(FARMER)
     local M = H.ns.Markers
     local clip = H.Clip("chatter", FARMER, { text = "Nice day for it.", key = "m1" })
+    local said = #H.chat
     H.Spoken("CLIP_STARTED", clip)
     check(M:Showing(FARMER), "a bubble while its voice plays")
+    check(#H.chat == said, "with nameplates on, nothing to explain", H.LastChat())
     local bubble
     for _, f in ipairs(H.frames) do
         if f.parent == plate then bubble = f end
@@ -1646,7 +1650,7 @@ scenario("who's talking: a bubble over the NPC", function()
     check(not M:Showing(FARMER), "Mark who's talking off: none at all")
     H.settings.registered.EARSHOT_MARKERS:SetValue(true)
     check(M:Showing(FARMER), "back on mid-line: there it is")
-    local J = NewClient({ spoken = "Ambience" })
+    local J = NewClient({ spoken = "Ambience", cvars = PLATES_ON })
     J.npcs[FARMER] = { north = 10, west = 0 }
     J.Spoken("CLIP_STARTED", J.Clip("chatter", FARMER, { text = "Over here.", key = "m3" }))
     check(not J.ns.Markers:Showing(FARMER), "no nameplate, no bubble")
@@ -1657,8 +1661,66 @@ scenario("who's talking: a bubble over the NPC", function()
     check(#H.errors + #J.errors == 0, "no errors", H.errors[1] or J.errors[1])
 end)
 
-scenario("status, the minimap addon menu and the settings layout", function()
+scenario("who's talking: says what's missing when the bubble can't show", function()
+    local function Count(H, pattern)
+        local n = 0
+        for _, line in ipairs(H.chat) do if line:find(pattern, 1, true) then n = n + 1 end end
+        return n
+    end
+    local function Status(H)
+        local before = #H.chat
+        H.Slash("status")
+        return table.concat(H.chat, "\n", before + 1)
+    end
+    -- The game's own settings: no friendly NPC nameplates (the harness starts with both off).
     local H = NewClient({ spoken = "Ambience" })
+    H.npcs[FARMER] = { north = 10, west = 0 }
+    H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "First words.", key = "h1" }))
+    check(Count(H, "switch on Friendly NPC nameplates") == 1,
+        "the first voice without nameplates says how to see the bubble", H.LastChat())
+    check(Count(H, "Untick Mark who's talking") == 1, "and how to do without it")
+    H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "More words.", key = "h2" }))
+    check(Count(H, "switch on Friendly NPC nameplates") == 1, "only once", tostring(Count(H, "switch on Friendly")))
+    check(H.ns.db.markerHint == true, "and not again after a reload (it's saved)")
+    local said = Status(H)
+    check(said:find("Friendly NPC nameplates are off", 1, true) ~= nil, "/earshot status says so too", said)
+    -- Ticking Mark who's talking without them says so at once.
+    H.settings.registered.EARSHOT_MARKERS:SetValue(false)
+    local before = #H.chat
+    H.settings.registered.EARSHOT_MARKERS:SetValue(true)
+    check(#H.chat == before + 1 and H.LastChat():find("Friendly NPC nameplates are off", 1, true) ~= nil,
+        "ticking Mark who's talking without nameplates explains why nothing shows", H.LastChat())
+    -- Mark who's talking off: nothing to say.
+    local J = NewClient({ spoken = "Ambience", db = { markers = false } })
+    J.npcs[FARMER] = { north = 10, west = 0 }
+    J.Spoken("CLIP_STARTED", J.Clip("chatter", FARMER, { text = "Hello.", key = "h3" }))
+    check(Count(J, "Friendly NPC nameplates") == 0 and Status(J):find("nameplate", 1, true) == nil,
+        "with Mark who's talking off, no hint and nothing in status")
+    -- Friendly NPC nameplates on, Always Show off: only your target gets one.
+    local K = NewClient({ spoken = "Ambience", cvars = { nameplateShowFriendlyNpcs = "1", nameplateShowAll = "0" } })
+    K.npcs[FARMER] = { north = 10, west = 0 }
+    K.Spoken("CLIP_STARTED", K.Clip("chatter", FARMER, { text = "Hello.", key = "h4" }))
+    check(Count(K, "Friendly NPC nameplates") == 0, "friendly nameplates on: no hint as a voice plays")
+    said = Status(K)
+    check(said:find("only your target", 1, true) ~= nil, "status says only your target gets the bubble", said)
+    -- Both on: nothing to say. And a client without the option at all stays quiet.
+    local L = NewClient({ spoken = "Ambience", cvars = PLATES_ON })
+    L.npcs[FARMER] = { north = 10, west = 0 }
+    L.Spoken("CLIP_STARTED", L.Clip("chatter", FARMER, { text = "Hello.", key = "h5" }))
+    check(Count(L, "nameplate") == 0 and Status(L):find("nameplate", 1, true) == nil,
+        "both on: no hint, and status is quiet about it")
+    local N = NewClient({ spoken = "Ambience" })
+    N.cvars.nameplateShowFriendlyNpcs, N.cvars.nameplateShowAll = nil, nil
+    N.npcs[FARMER] = { north = 10, west = 0 }
+    N.Spoken("CLIP_STARTED", N.Clip("chatter", FARMER, { text = "Hello.", key = "h6" }))
+    check(Count(N, "nameplate") == 0 and Status(N):find("nameplate", 1, true) == nil,
+        "a client without the option: no hint, nothing in status")
+    check(#H.errors + #J.errors + #K.errors + #L.errors + #N.errors == 0, "no errors",
+        H.errors[1] or J.errors[1] or K.errors[1] or L.errors[1] or N.errors[1])
+end)
+
+scenario("status, the minimap addon menu and the settings layout", function()
+    local H = NewClient({ spoken = "Ambience", cvars = PLATES_ON })
     H.MoveTo(0, 0, 0)
     H.Fire("CHAT_MSG_MONSTER_SAY", "Fine weather.", "Farmer")
     H.Spoken("CLIP_STARTED", H.Clip("chatter", FARMER, { text = "Fine weather.", key = "c-status" }))

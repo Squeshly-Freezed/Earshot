@@ -194,14 +194,20 @@ function Options:Register()
 
     Header("Who's talking")
     local markers, markersInit = Checkbox("markers", "Mark who's talking",
-        "A small speech bubble over the NPC whose voice is playing. It sits on the NPC's nameplate, so it shows "
-        .. "when you have friendly NPC nameplates on in the game's options.")
+        "A small speech bubble over the NPC whose voice is playing. It sits on the NPC's nameplate, so it needs "
+        .. "the game's Friendly NPC nameplates on (Options, under Nameplates), and Always Show Nameplates to show "
+        .. "over NPCs you haven't targeted.")
     Row(markersInit)
     local unvoiced, unvoicedInit = Checkbox("markSilent", "Also NPCs talking without a voice",
         "NPC lines that only show in chat, such as the game's own lines Spoken has no voice for. The bubble stays "
         .. "for about as long as the line takes to say.")
     Under(Row(unvoicedInit), markersInit, function() return db.markers end)
-    markers:SetValueChangedCallback(function() ns.Markers:Refresh() end)
+    markers:SetValueChangedCallback(function(_, value)
+        ns.Markers:Refresh()
+        -- Ticked without the nameplates it needs: say so, rather than show nothing.
+        local problem = value and ns.Markers:Problem()
+        if problem then ns.Print(problem) end
+    end)
     unvoiced:SetValueChangedCallback(function() ns.Markers:Refresh() end)
 
     -- The game already places its own world sounds. These are two of its own switches.
@@ -260,6 +266,8 @@ function ns.Status()
     if not ns.PlayerPosition() then
         ns.Print("The game hides positions here, so voices play as normal.")
     end
+    local problem = db.enabled and ns.Markers:Problem()
+    if problem then ns.Print(problem) end
     local session = ns.Spatial.session
     local info = session and ns.Spatial.info
     if info and info.elsewhere then
