@@ -22,6 +22,10 @@ Earshot needs [Spoken](https://www.curseforge.com/wow/addons/spoken).
 2. `/reload`, then `/earshot test` outdoors. Walk away and turn around: the tune fades, and
    goes softer behind you.
 
+`/earshot status` (or **Check your setup** on the settings page) says what Earshot is doing:
+
+<img src="media/status.png" width="640" alt="/earshot status in chat: On. Spoken's voices follow Ambience Volume, which Earshot can fade. You're set. Placing a voice 12 yd away, in front of you, at 79% volume.">
+
 The full guide, with every setting, is in [Earshot/README.md](Earshot/README.md).
 
 ## What it does
@@ -32,8 +36,11 @@ The full guide, with every setting, is in [Earshot/README.md](Earshot/README.md)
   you, and how quiet a voice may get.
 - You choose what happens when you walk out of earshot: keep playing quietly, skip the
   line, skip that NPC's lines, skip every NPC out of earshot, or wait until you come back.
-- A speech bubble shows who's talking, on NPC nameplates.
+- A speech bubble shows who's talking. It sits on nameplates, so switch on the game's
+  Friendly NPC nameplates to see it.
 - Works with Spoken 3.12's Previous and Mute.
+
+<p align="center"><img src="media/settings.png" width="460" alt="Earshot's settings page: Distance (Fade voices with distance, Preset, the distance and volume sliders, When you walk out of earshot), Voices to place, Who's talking, The game's own sounds, and Test and setup."></p>
 
 ## How it works
 

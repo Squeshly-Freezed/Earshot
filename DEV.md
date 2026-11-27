@@ -75,6 +75,11 @@ python tools/make_logo.py
 python tools/make_marker.py Earshot/Media/Speaking.tga
 ```
 
+`media/settings.png` and `media/status.png` are screenshots from the game, for the README
+and CurseForge. The settings page is two shots joined into one, with the scrollbar painted
+out. Retake them when the settings page changes. Like the rest of `media/`, they stay out of
+the zip.
+
 ## A new version
 
 1. Bump `## Version` in `Earshot/Earshot.toc` and add a section to `CHANGELOG.md`.
