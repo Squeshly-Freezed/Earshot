@@ -7,7 +7,8 @@
   (and, for NPCs other than your target, Always Show Nameplates). Since 0.4 Earshot doesn't
   switch those on, so the first time a voice plays without them it says how to see the
   bubble, once. Ticking Mark who's talking without them, and `/earshot status`, say so too.
-- The guide says which nameplate options the bubble needs.
+- The guide says which nameplate options the bubble needs, and that you can report bugs in
+  the CurseForge comments too.
 
 ## 0.4.0
 

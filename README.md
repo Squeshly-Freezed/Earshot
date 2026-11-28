@@ -7,7 +7,10 @@ carry further.
 
 ## Download
 
-Download `Earshot-<version>.zip` from
+Install it from [CurseForge](https://www.curseforge.com/wow/addons/earshot): the CurseForge
+app installs Spoken with it and keeps both up to date.
+
+Or download `Earshot-<version>.zip` from
 [Releases](https://github.com/Squeshly-Freezed/Earshot/releases) and extract it into the
 `Interface\AddOns` folder of WoW Forever, next to Spoken. GitHub's green Code > Download
 ZIP button gives you the source instead, which the game won't load as it is.
@@ -51,7 +54,8 @@ It knows where you are and which way you face, and where the NPC was when you ta
 
 ## Bugs and feedback
 
-Report bugs on [GitHub](https://github.com/Squeshly-Freezed/Earshot/issues).
+Report bugs in the comments on [CurseForge](https://www.curseforge.com/wow/addons/earshot) or on
+[GitHub](https://github.com/Squeshly-Freezed/Earshot/issues).
 
 ## Development
 

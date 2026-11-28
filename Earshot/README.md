@@ -126,7 +126,8 @@ you click on them: the game doesn't tell addons about those.
 
 ## Bugs and feedback
 
-Report bugs on [GitHub](https://github.com/Squeshly-Freezed/Earshot/issues).
+Report bugs in the comments on [CurseForge](https://www.curseforge.com/wow/addons/earshot) or on
+[GitHub](https://github.com/Squeshly-Freezed/Earshot/issues).
 
 ## For other voice addons
 
